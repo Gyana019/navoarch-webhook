@@ -6,7 +6,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 VERIFY_TOKEN = "navoarch_token"
-ACCESS_TOKEN = "EAAOYazi12RkBO2tpoVJkorQXNhLJYFCxXisUL3UGVkZBSszWX1ifjsBLLcZBL6FloT3I8EZALCqg2U45HoeZB6gjEPZByRea1DSA1eFq7HhuJ0801Qj25XOVMLqmyHeZCV3SReINFgyeUyua77OO4bJGtQoZBQnQrBUrVJdLPgJs1HZBC0UZCxa67h9PbefUmJMtZACxFDMTykRAOWyXGoNMzHfB5IK0gZD"  # Replace with your permanent token
+ACCESS_TOKEN = "EAAOYazi12RkBO0g7aqBsWNeycB0CkuP1cmt6YXUgOFzJvim6PaQ7FrZCCNFtIradZAwjk8uKbipjgnkVQFQRWAvZBSSOSCMKopGZBj37OJsTg2VJTBt7Tp0FX3V5rGWQPam0tNdxqAaU7VrFwGegbJcKaRhGq57uvPzao2sYgpZAJVE07kqXY3WaPrtF0IS1urcxke69bdRmLZA6tGJ97I9FhvdxsZD"  # Replace with your permanent token
 PHONE_NUMBER_ID = "651744254683036"
 
 # In-memory state storage (should ideally be a database)
