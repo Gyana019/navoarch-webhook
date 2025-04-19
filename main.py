@@ -20,7 +20,7 @@ def webhook():
 
     if request.method == "POST":
         data = request.get_json()
-        print("📥 Webhook Received:\n", json.dumps(data, indent=2))
+        print("\ud83d\udcc5 Webhook Received:\n", json.dumps(data, indent=2))
 
         try:
             for entry in data.get("entry", []):
@@ -28,12 +28,10 @@ def webhook():
                     value = change.get("value", {})
                     messages = value.get("messages", [])
                     if messages:
-                        phone_number_id = value["metadata"]["phone_number_id"]
                         from_number = messages[0]["from"]
-
                         send_template_reply(from_number)
         except Exception as e:
-            print("❌ Error while processing message:", e)
+            print("\u274c Error while processing message:", e)
 
         return "EVENT_RECEIVED", 200
 
@@ -48,15 +46,33 @@ def send_template_reply(recipient_number):
         "to": recipient_number,
         "type": "template",
         "template": {
-            "name": "hello_world",
-            "language": {
-                "code": "en_US"
-            }
+            "name": "navoarch_welcome_01",
+            "language": { "code": "en" },
+            "components": [
+                {
+                    "type": "button",
+                    "sub_type": "quick_reply",
+                    "index": "0",
+                    "parameters": [{"type": "payload", "payload": "BUILD_PROJECT"}]
+                },
+                {
+                    "type": "button",
+                    "sub_type": "quick_reply",
+                    "index": "1",
+                    "parameters": [{"type": "payload", "payload": "HOME_DESIGN"}]
+                },
+                {
+                    "type": "button",
+                    "sub_type": "quick_reply",
+                    "index": "2",
+                    "parameters": [{"type": "payload", "payload": "TALK_TEAM"}]
+                }
+            ]
         }
     }
 
     response = requests.post(url, headers=headers, json=payload)
-    print("📤 Template Reply Sent:", response.status_code, response.text)
+    print("\ud83d\udce4 Template Reply Sent:", response.status_code, response.text)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
