@@ -28,7 +28,7 @@ def send_template_reply(recipient_number, template_name):
         }
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent template reply:", response.status_code, response.text)
+    print("\U0001F4E4 Sent template reply:", response.status_code, response.text)
 
 def send_text_message(recipient_number, message):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
@@ -43,7 +43,7 @@ def send_text_message(recipient_number, message):
         "text": {"body": message}
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent text message:", response.status_code, response.text)
+    print("\U0001F4E4 Sent text message:", response.status_code, response.text)
 
 def send_schedule_buttons(recipient_number):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
@@ -62,13 +62,13 @@ def send_schedule_buttons(recipient_number):
                 "buttons": [
                     {"type": "reply", "reply": {"id": "call_today_evening", "title": "Today Evening"}},
                     {"type": "reply", "reply": {"id": "call_tomorrow_morning", "title": "Tomorrow Morning"}},
-                    {"type": "reply", "reply": {"id": "custom_time", "title": "Other Time"}}
+                    {"type": "reply", "reply": {"id": "custom_time", "title": "Choose Custom Time"}}
                 ]
             }
         }
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent schedule button:", response.status_code, response.text)
+    print("\U0001F4E4 Sent schedule button:", response.status_code, response.text)
 
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
@@ -82,7 +82,7 @@ def webhook():
 
     if request.method == "POST":
         data = request.get_json()
-        print("📥 Webhook Received:\n", json.dumps(data, indent=2))
+        print("\U0001F4E5 Webhook Received:\n", json.dumps(data, indent=2))
 
         try:
             for entry in data.get("entry", []):
@@ -108,7 +108,7 @@ def webhook():
                             else:
                                 send_text_message(
                                     from_number,
-                                    "Hi 👋, welcome to NAVOARCH! How can we assist you today?\n\n• Plan a Building Project\n• Home Design Assistance\n• Talk to Our Team\n\n(Reply with: Plan / Home / Talk)"
+                                    "Hi \U0001F44B, welcome to NAVOARCH! How can we assist you today?\n\n• Plan a Building Project\n• Home Design Assistance\n• Talk to Our Team\n\n(Reply with: Plan / Home / Talk)"
                                 )
 
                         elif user_session["step"] == "get_name":
@@ -139,8 +139,8 @@ def webhook():
                                     send_text_message(from_number, "It's a bit late today. Can we schedule for tomorrow morning instead?")
                             elif "tomorrow" in text:
                                 send_text_message(from_number, "Our architect will call between 10 AM – 12 PM tomorrow.")
-                            elif "other" in text:
-                                send_text_message(from_number, "Please type the preferred time (e.g., 'Monday 3 PM').")
+                            elif "other" in text or "custom" in text:
+                                send_text_message(from_number, "Please type your preferred day and time (e.g., 'Monday 3 PM').")
                                 user_session["step"] = "manual_schedule"
                                 session_data[from_number] = user_session
                                 return "EVENT_RECEIVED", 200
