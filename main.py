@@ -1,6 +1,7 @@
 from flask import Flask, request
 import requests
 import json
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -44,6 +45,31 @@ def send_text_message(recipient_number, message):
     response = requests.post(url, headers=headers, json=payload)
     print("📤 Sent text message:", response.status_code, response.text)
 
+def send_schedule_buttons(recipient_number):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_number,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {"text": "When would be a good time for our architect to call you?"},
+            "action": {
+                "buttons": [
+                    {"type": "reply", "reply": {"id": "call_today_evening", "title": "Today Evening"}},
+                    {"type": "reply", "reply": {"id": "call_tomorrow_morning", "title": "Tomorrow Morning"}},
+                    {"type": "reply", "reply": {"id": "custom_time", "title": "Other Time"}}
+                ]
+            }
+        }
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    print("📤 Sent schedule button:", response.status_code, response.text)
+
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
     if request.method == "GET":
@@ -71,45 +97,69 @@ def webhook():
 
                         if user_session["step"] == "start":
                             if "plan" in text:
-                                send_text_message(from_number, "Great! Let’s help you plan your building project. May I know your name?")
+                                send_text_message(from_number, "Great! Let's plan your building project. What's your name?")
                                 session_data[from_number] = {"step": "get_name", "flow": "plan"}
                             elif "home" in text:
-                                send_text_message(from_number, "Thanks for choosing home design assistance! What’s your name?")
+                                send_text_message(from_number, "Awesome! What’s your name so we can assist with home design?")
                                 session_data[from_number] = {"step": "get_name", "flow": "home"}
                             elif "talk" in text:
-                                send_text_message(from_number, "Sure! May I know your name so our team can reach out?")
+                                send_text_message(from_number, "Sure! Can I have your name so our team can reach out?")
                                 session_data[from_number] = {"step": "get_name", "flow": "talk"}
                             else:
-                                send_text_message(from_number, "Hi 👋, welcome to NAVOARCH! How can we assist you today?\n\n• Plan a Building Project\n• Home Design Assistance\n• Talk to Our Team")
+                                send_text_message(
+                                    from_number,
+                                    "Hi 👋, welcome to NAVOARCH! How can we assist you today?\n\n• Plan a Building Project\n• Home Design Assistance\n• Talk to Our Team\n\n(Reply with: Plan / Home / Talk)"
+                                )
 
                         elif user_session["step"] == "get_name":
                             user_session["name"] = text
-                            send_text_message(from_number, "Thanks, {0}! Could you share your email ID?".format(text.title()))
+                            send_text_message(from_number, f"Thanks, {text.title()}! What’s your email ID?")
                             user_session["step"] = "get_email"
                             session_data[from_number] = user_session
 
                         elif user_session["step"] == "get_email":
                             user_session["email"] = text
-                            send_text_message(from_number, "Got it. Can you provide your project site address?")
+                            send_text_message(from_number, "Got it! Could you share your project site address?")
                             user_session["step"] = "get_address"
                             session_data[from_number] = user_session
 
                         elif user_session["step"] == "get_address":
                             user_session["address"] = text
-                            send_text_message(from_number, "When would be a good time for our architect to call you?")
+                            send_schedule_buttons(from_number)
                             user_session["step"] = "get_schedule"
                             session_data[from_number] = user_session
 
                         elif user_session["step"] == "get_schedule":
-                            user_session["schedule"] = text
+                            if "today" in text:
+                                now = datetime.now()
+                                hour = now.hour
+                                if hour < 17:
+                                    send_text_message(from_number, "We can arrange a callback between 6 PM – 8 PM today. Let us know if that works.")
+                                else:
+                                    send_text_message(from_number, "It's a bit late today. Can we schedule for tomorrow morning instead?")
+                            elif "tomorrow" in text:
+                                send_text_message(from_number, "Our architect will call between 10 AM – 12 PM tomorrow.")
+                            elif "other" in text:
+                                send_text_message(from_number, "Please type the preferred time (e.g., 'Monday 3 PM').")
+                                user_session["step"] = "manual_schedule"
+                                session_data[from_number] = user_session
+                                return "EVENT_RECEIVED", 200
+
                             send_text_message(from_number, "Thank you! Our team will contact you shortly. ✨")
                             print("✅ Client Info:", user_session)
-                            session_data[from_number] = {"step": "start"}  # reset session
+                            session_data[from_number] = {"step": "start"}
 
-                            # TODO: Integrate Google Sheets/API
+                        elif user_session.get("step") == "manual_schedule":
+                            user_session["custom_time"] = text
+                            send_text_message(from_number, f"Thank you! We've noted '{text}' as your preferred call time. ✨")
+                            print("✅ Client Info:", user_session)
+                            session_data[from_number] = {"step": "start"}
 
                         else:
-                            send_text_message(from_number, "Sorry, I didn’t understand that. Please type your response or choose an option.")
+                            send_text_message(
+                                from_number,
+                                "Sorry, I didn’t understand that. Please type your reply clearly or send 'menu' to restart."
+                            )
 
         except Exception as e:
             print("❌ Error while processing message:", e)
