@@ -5,7 +5,7 @@ import json
 app = Flask(__name__)
 
 VERIFY_TOKEN = "navoarch_token"
-ACCESS_TOKEN = "EAAOYazi12RkBO5toZAc7HX3Wh9C8m6upC8bZAYholpb0emycZA8xy2hvv7Xj5hNYUQ9ZAE1SaQkktohuRrPefkKGvCc1jLBmwVmBxILVXeXc1xbv3OTtGbHyPtnWPCmJOit3qmVIHYNrPrDyfeOcpI6BQa0Jrw76o10SHco3lD5Dy4P0K041KjNkI9RaciFxTEBvjiBAbDxARMC8KXbaBHRMp6cZD"
+ACCESS_TOKEN = "EAAOYazi12RkBOxtG4zyHqthQigSagLQQf8rcNZCjkTM7SWzbYHKjhThiX6xq1l9JgwXtyu7XRS0E2hFHPAsnhc6zzLtcVG10V49s4OOPMFZAhcCwvMOPWvl70akjetnwluMhr03buQsGZAHq5v8roe0spbreYvZAtVBmQ2Rzl4yKqcCMIAl2RywTZAAZAYXEO8BS8bF8Crp75lFLW5kQYiZBHPAlZCgZD"
 PHONE_NUMBER_ID = "651744254683036"
 
 @app.route("/webhook", methods=["GET", "POST"])
@@ -20,7 +20,7 @@ def webhook():
 
     if request.method == "POST":
         data = request.get_json()
-        print("\ud83d\udcc5 Webhook Received:\n", json.dumps(data, indent=2))
+        print("📥 Webhook Received:\n", json.dumps(data, indent=2))
 
         try:
             for entry in data.get("entry", []):
@@ -28,12 +28,13 @@ def webhook():
                     value = change.get("value", {})
                     messages = value.get("messages", [])
                     if messages:
-                        from_number = messages[0]["from"]
-                        send_template_reply(from_number)
+                        sender_id = messages[0]["from"]
+                        send_template_reply(sender_id)
         except Exception as e:
-            print("\u274c Error while processing message:", e)
+            print("❌ Error while processing message:", e)
 
         return "EVENT_RECEIVED", 200
+
 
 def send_template_reply(recipient_number):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
@@ -41,38 +42,22 @@ def send_template_reply(recipient_number):
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
+
     payload = {
         "messaging_product": "whatsapp",
         "to": recipient_number,
         "type": "template",
         "template": {
             "name": "navoarch_welcome_01",
-            "language": { "code": "en" },
-            "components": [
-                {
-                    "type": "button",
-                    "sub_type": "quick_reply",
-                    "index": "0",
-                    "parameters": [{"type": "payload", "payload": "BUILD_PROJECT"}]
-                },
-                {
-                    "type": "button",
-                    "sub_type": "quick_reply",
-                    "index": "1",
-                    "parameters": [{"type": "payload", "payload": "HOME_DESIGN"}]
-                },
-                {
-                    "type": "button",
-                    "sub_type": "quick_reply",
-                    "index": "2",
-                    "parameters": [{"type": "payload", "payload": "TALK_TEAM"}]
-                }
-            ]
+            "language": {
+                "code": "en"
+            }
         }
     }
 
     response = requests.post(url, headers=headers, json=payload)
-    print("\ud83d\udce4 Template Reply Sent:", response.status_code, response.text)
+    print("📤 Sent template reply:", response.status_code, response.text)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
