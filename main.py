@@ -5,7 +5,7 @@ import json
 app = Flask(__name__)
 
 VERIFY_TOKEN = "navoarch_token"
-ACCESS_TOKEN = "EAAOYazi12RkBOxtG4zyHqthQigSagLQQf8rcNZCjkTM7SWzbYHKjhThiX6xq1l9JgwXtyu7XRS0E2hFHPAsnhc6zzLtcVG10V49s4OOPMFZAhcCwvMOPWvl70akjetnwluMhr03buQsGZAHq5v8roe0spbreYvZAtVBmQ2Rzl4yKqcCMIAl2RywTZAAZAYXEO8BS8bF8Crp75lFLW5kQYiZBHPAlZCgZD"
+ACCESS_TOKEN = "EAAOYazi12RkBO5toZAc7HX3Wh9C8m6upC8bZAYholpb0emycZA8xy2hvv7Xj5hNYUQ9ZAE1SaQkktohuRrPefkKGvCc1jLBmwVmBxILVXeXc1xbv3OTtGbHyPtnWPCmJOit3qmVIHYNrPrDyfeOcpI6BQa0Jrw76o10SHco3lD5Dy4P0K041KjNkI9RaciFxTEBvjiBAbDxARMC8KXbaBHRMp6cZD"
 PHONE_NUMBER_ID = "651744254683036"
 
 @app.route("/webhook", methods=["GET", "POST"])
@@ -23,44 +23,40 @@ def webhook():
         print("📥 Webhook Received:\n", json.dumps(data, indent=2))
 
         try:
-            entry = data['entry'][0]
-            changes = entry['changes'][0]
-            value = changes['value']
+            for entry in data.get("entry", []):
+                for change in entry.get("changes", []):
+                    value = change.get("value", {})
+                    messages = value.get("messages", [])
+                    if messages:
+                        phone_number_id = value["metadata"]["phone_number_id"]
+                        from_number = messages[0]["from"]
 
-            if 'messages' in value:
-                message = value['messages'][0]
-                phone_number = message['from']
-                msg_body = message['text']['body']
-
-                print(f"📩 Message from {phone_number}: {msg_body}")
-
-                # Auto reply with button template message
-                send_button_template(phone_number)
-
+                        send_template_reply(from_number)
         except Exception as e:
-            print("❌ Error processing message:", str(e))
+            print("❌ Error while processing message:", e)
 
         return "EVENT_RECEIVED", 200
 
-def send_button_template(to):
-    url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
+def send_template_reply(recipient_number):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
     payload = {
         "messaging_product": "whatsapp",
-        "to": to,
+        "to": recipient_number,
         "type": "template",
         "template": {
-            "name": "navoarch_welcome_01",  # must be pre-approved in Meta
+            "name": "hello_world",
             "language": {
-                "code": "en"
+                "code": "en_US"
             }
         }
     }
+
     response = requests.post(url, headers=headers, json=payload)
-    print("📤 Template Message Sent:", response.status_code, response.text)
+    print("📤 Template Reply Sent:", response.status_code, response.text)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
