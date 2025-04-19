@@ -28,7 +28,9 @@ def send_template_with_buttons(recipient_number):
         }
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("\U0001F4E4 Sent template with buttons:", response.status_code, response.text)
+    print("📤 Sent template with buttons:", response.status_code, response.text)
+
+    session_data[recipient_number] = {"step": "await_main_choice", "template_sent": True}
 
 def send_text_message(recipient_number, message):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
@@ -43,7 +45,41 @@ def send_text_message(recipient_number, message):
         "text": {"body": message}
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("\U0001F4E4 Sent text message:", response.status_code, response.text)
+    print("📤 Sent text message:", response.status_code, response.text)
+
+def send_project_type_buttons(recipient_number):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_number,
+        "type": "template",
+        "template": {
+            "name": "send_project_type_buttons",
+            "language": {"code": "en"}
+        }
+    }
+    requests.post(url, headers=headers, json=payload)
+
+def send_design_type_buttons(recipient_number):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_number,
+        "type": "template",
+        "template": {
+            "name": "send_home_design_type_buttons",
+            "language": {"code": "en"}
+        }
+    }
+    requests.post(url, headers=headers, json=payload)
 
 def send_schedule_buttons(recipient_number):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
@@ -54,21 +90,67 @@ def send_schedule_buttons(recipient_number):
     payload = {
         "messaging_product": "whatsapp",
         "to": recipient_number,
-        "type": "interactive",
-        "interactive": {
-            "type": "button",
-            "body": {"text": "When would be a good time for our architect to call you?"},
-            "action": {
-                "buttons": [
-                    {"type": "reply", "reply": {"id": "call_today_evening", "title": "Today Evening"}},
-                    {"type": "reply", "reply": {"id": "call_tomorrow_morning", "title": "Tomorrow Morning"}},
-                    {"type": "reply", "reply": {"id": "custom_time", "title": "Choose Custom Time"}}
-                ]
-            }
+        "type": "template",
+        "template": {
+            "name": "send_schedule_buttons",
+            "language": {"code": "en"}
+        }
+    }
+    requests.post(url, headers=headers, json=payload)
+
+def send_tomorrow_session_slot(recipient_number):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_number,
+        "type": "template",
+        "template": {
+            "name": "send_tomorrow_session_slot",
+            "language": {"code": "en"}
         }
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("\U0001F4E4 Sent schedule button:", response.status_code, response.text)
+    print("📤 Sent tomorrow time slots:", response.status_code, response.text)
+
+def send_get_client_info_template(recipient_number):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_number,
+        "type": "template",
+        "template": {
+            "name": "get_client_info_after_project_type",
+            "language": {"code": "en"}
+        }
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    print("📤 Sent info collection message:", response.status_code, response.text)
+
+def send_confirm_today_evening(recipient_number):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_number,
+        "type": "template",
+        "template": {
+            "name": "confirm_today_evening",
+            "language": {"code": "en"}
+        }
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    print("📤 Sent confirm today evening slots:", response.status_code, response.text)
 
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
@@ -82,90 +164,44 @@ def webhook():
 
     if request.method == "POST":
         data = request.get_json()
-        print("\U0001F4E5 Webhook Received:\n", json.dumps(data, indent=2))
+        print("📥 Webhook Received:\n", json.dumps(data, indent=2))
 
         try:
-            for entry in data.get("entry", []):
-                for change in entry.get("changes", []):
-                    value = change.get("value", {})
-                    messages = value.get("messages", [])
-                    if messages:
-                        from_number = messages[0]["from"]
-                        text = messages[0].get("text", {}).get("body", "").strip().lower()
-                        interactive = messages[0].get("interactive", {}).get("button_reply", {}).get("id")
+            changes = data.get("entry", [])[0].get("changes", [])[0]
+            value = changes.get("value", {})
+            message = value.get("messages", [{}])[0]
+            sender = message.get("from")
 
-                        user_session = session_data.get(from_number, {"step": "start"})
+            if "interactive" in message:
+                reply_id = message["interactive"]["button_reply"]["id"]
+                print("🔘 Button clicked:", reply_id)
 
-                        if user_session["step"] == "start":
-                            if interactive:
-                                if interactive == "plan_project":
-                                    send_text_message(from_number, "Great! Let's plan your building project. What's your name?")
-                                    session_data[from_number] = {"step": "get_name", "flow": "plan"}
-                                elif interactive == "home_design":
-                                    send_text_message(from_number, "Awesome! What’s your name so we can assist with home design?")
-                                    session_data[from_number] = {"step": "get_name", "flow": "home"}
-                                elif interactive == "talk_team":
-                                    send_text_message(from_number, "Sure! Can I have your name so our team can reach out?")
-                                    session_data[from_number] = {"step": "get_name", "flow": "talk"}
-                                else:
-                                    send_template_with_buttons(from_number)
-                            else:
-                                send_template_with_buttons(from_number)
+                if reply_id == "plan_project":
+                    send_project_type_buttons(sender)
+                elif reply_id == "home_design":
+                    send_design_type_buttons(sender)
+                elif reply_id == "talk_team":
+                    send_schedule_buttons(sender)
+                elif reply_id == "today_evening":
+                    send_confirm_today_evening(sender)
+                elif reply_id == "tomorrow":
+                    send_tomorrow_session_slot(sender)
+                elif reply_id == "residential_project":
+                    send_get_client_info_template(sender)
+                elif reply_id == "share_client_info":
+                    send_get_client_info_template(sender)
+                else:
+                    send_text_message(sender, "Sorry, I didn’t understand that. Please select an option from the buttons.")
 
-                        elif user_session["step"] == "get_name":
-                            user_session["name"] = text
-                            send_text_message(from_number, f"Thanks, {text.title()}! What’s your email ID?")
-                            user_session["step"] = "get_email"
-                            session_data[from_number] = user_session
-
-                        elif user_session["step"] == "get_email":
-                            user_session["email"] = text
-                            send_text_message(from_number, "Got it! Could you share your project site address?")
-                            user_session["step"] = "get_address"
-                            session_data[from_number] = user_session
-
-                        elif user_session["step"] == "get_address":
-                            user_session["address"] = text
-                            send_schedule_buttons(from_number)
-                            user_session["step"] = "get_schedule"
-                            session_data[from_number] = user_session
-
-                        elif user_session["step"] == "get_schedule":
-                            if "today" in text:
-                                now = datetime.now()
-                                hour = now.hour
-                                if hour < 17:
-                                    send_text_message(from_number, "We can arrange a callback between 6 PM – 8 PM today. Let us know if that works.")
-                                else:
-                                    send_text_message(from_number, "It's a bit late today. Can we schedule for tomorrow morning instead?")
-                            elif "tomorrow" in text:
-                                send_text_message(from_number, "Our architect will call between 10 AM – 12 PM tomorrow.")
-                            elif "other" in text or "custom" in text:
-                                send_text_message(from_number, "Please type your preferred day and time (e.g., 'Monday 3 PM').")
-                                user_session["step"] = "manual_schedule"
-                                session_data[from_number] = user_session
-                                return "EVENT_RECEIVED", 200
-
-                            send_text_message(from_number, "Thank you! Our team will contact you shortly. ✨")
-                            print("✅ Client Info:", user_session)
-                            session_data[from_number] = {"step": "start"}
-
-                        elif user_session.get("step") == "manual_schedule":
-                            user_session["custom_time"] = text
-                            send_text_message(from_number, f"Thank you! We've noted '{text}' as your preferred call time. ✨")
-                            print("✅ Client Info:", user_session)
-                            session_data[from_number] = {"step": "start"}
-
-                        else:
-                            send_text_message(
-                                from_number,
-                                "Sorry, I didn’t understand that. Please type your reply clearly or send 'menu' to restart."
-                            )
+            elif "text" in message:
+                text = message["text"]["body"].lower()
+                print("💬 Text received:", text)
+                if "hi" in text or "hello" in text:
+                    send_template_with_buttons(sender)
+                else:
+                    send_text_message(sender, "Hi 👋, please select one of the options from the buttons above to proceed.")
 
         except Exception as e:
-            print("❌ Error while processing message:", e)
+            print("❌ Error in webhook handler:", str(e))
 
         return "EVENT_RECEIVED", 200
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
