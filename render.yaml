@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: navoarch-webhook
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python main.py"
