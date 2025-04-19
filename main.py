@@ -6,13 +6,13 @@ from datetime import datetime
 app = Flask(__name__)
 
 VERIFY_TOKEN = "navoarch_token"
-ACCESS_TOKEN = "EAAOYazi12RkBO2tpoVJkorQXNhLJYFCxXisUL3UGVkZBSszWX1ifjsBLLcZBL6FloT3I8EZALCqg2U45HoeZB6gjEPZByRea1DSA1eFq7HhuJ0801Qj25XOVMLqmyHeZCV3SReINFgyeUyua77OO4bJGtQoZBQnQrBUrVJdLPgJs1HZBC0UZCxa67h9PbefUmJMtZACxFDMTykRAOWyXGoNMzHfB5IK0gZD"  # Replace with your latest token
+ACCESS_TOKEN = "EAAOYazi12RkBO2tpoVJkorQXNhLJYFCxXisUL3UGVkZBSszWX1ifjsBLLcZBL6FloT3I8EZALCqg2U45HoeZB6gjEPZByRea1DSA1eFq7HhuJ0801Qj25XOVMLqmyHeZCV3SReINFgyeUyua77OO4bJGtQoZBQnQrBUrVJdLPgJs1HZBC0UZCxa67h9PbefUmJMtZACxFDMTykRAOWyXGoNMzHfB5IK0gZD"  # Replace with your permanent token
 PHONE_NUMBER_ID = "651744254683036"
 
 # In-memory state storage (should ideally be a database)
 session_data = {}
 
-def send_template_reply(recipient_number, template_name):
+def send_template_with_buttons(recipient_number):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
@@ -23,12 +23,12 @@ def send_template_reply(recipient_number, template_name):
         "to": recipient_number,
         "type": "template",
         "template": {
-            "name": template_name,
-            "language": {"code": "en_US"}
+            "name": "navoarch_welcome_01",
+            "language": {"code": "en"}
         }
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("\U0001F4E4 Sent template reply:", response.status_code, response.text)
+    print("\U0001F4E4 Sent template with buttons:", response.status_code, response.text)
 
 def send_text_message(recipient_number, message):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
@@ -92,24 +92,25 @@ def webhook():
                     if messages:
                         from_number = messages[0]["from"]
                         text = messages[0].get("text", {}).get("body", "").strip().lower()
+                        interactive = messages[0].get("interactive", {}).get("button_reply", {}).get("id")
 
                         user_session = session_data.get(from_number, {"step": "start"})
 
                         if user_session["step"] == "start":
-                            if "plan" in text:
-                                send_text_message(from_number, "Great! Let's plan your building project. What's your name?")
-                                session_data[from_number] = {"step": "get_name", "flow": "plan"}
-                            elif "home" in text:
-                                send_text_message(from_number, "Awesome! What’s your name so we can assist with home design?")
-                                session_data[from_number] = {"step": "get_name", "flow": "home"}
-                            elif "talk" in text:
-                                send_text_message(from_number, "Sure! Can I have your name so our team can reach out?")
-                                session_data[from_number] = {"step": "get_name", "flow": "talk"}
+                            if interactive:
+                                if interactive == "plan_project":
+                                    send_text_message(from_number, "Great! Let's plan your building project. What's your name?")
+                                    session_data[from_number] = {"step": "get_name", "flow": "plan"}
+                                elif interactive == "home_design":
+                                    send_text_message(from_number, "Awesome! What’s your name so we can assist with home design?")
+                                    session_data[from_number] = {"step": "get_name", "flow": "home"}
+                                elif interactive == "talk_team":
+                                    send_text_message(from_number, "Sure! Can I have your name so our team can reach out?")
+                                    session_data[from_number] = {"step": "get_name", "flow": "talk"}
+                                else:
+                                    send_template_with_buttons(from_number)
                             else:
-                                send_text_message(
-                                    from_number,
-                                    "Hi \U0001F44B, welcome to NAVOARCH! How can we assist you today?\n\n• Plan a Building Project\n• Home Design Assistance\n• Talk to Our Team\n\n(Reply with: Plan / Home / Talk)"
-                                )
+                                send_template_with_buttons(from_number)
 
                         elif user_session["step"] == "get_name":
                             user_session["name"] = text
