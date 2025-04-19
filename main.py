@@ -12,6 +12,7 @@ PHONE_NUMBER_ID = "651744254683036"
 # In-memory state storage (should ideally be a database)
 session_data = {}
 
+
 def send_template(recipient_number, template_name):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
     headers = {
@@ -28,7 +29,8 @@ def send_template(recipient_number, template_name):
         }
     }
     response = requests.post(url, headers=headers, json=payload)
-    print(f"📤 Sent template {template_name}:", response.status_code, response.text)
+    print(f"\U0001F4E4 Sent template {template_name}:", response.status_code, response.text)
+
 
 def send_text_message(recipient_number, message):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
@@ -43,11 +45,13 @@ def send_text_message(recipient_number, message):
         "text": {"body": message}
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent text message:", response.status_code, response.text)
+    print("\U0001F4E4 Sent text message:", response.status_code, response.text)
+
 
 def send_template_with_buttons(recipient_number):
     send_template(recipient_number, "navoarch_welcome_01")
     session_data[recipient_number] = {"step": "await_main_choice"}
+
 
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
@@ -61,7 +65,7 @@ def webhook():
 
     if request.method == "POST":
         data = request.get_json()
-        print("📥 Webhook Received:\n", json.dumps(data, indent=2))
+        print("\U0001F4E5 Webhook Received:\n", json.dumps(data, indent=2))
 
         try:
             changes = data.get("entry", [])[0].get("changes", [])[0]
@@ -70,41 +74,42 @@ def webhook():
             sender = message.get("from")
 
             if "interactive" in message:
-                button_text = message["interactive"]["button_reply"]["title"].strip().lower()
-                print("🔘 Button clicked:", button_text)
+                button_id = message["interactive"]["button_reply"]["id"]
+                print("\U0001F518 Button ID clicked:", button_id)
 
-                if "plan a building project" in button_text:
+                if button_id == "plan_project":
                     send_template(sender, "send_project_type_buttons")
-                elif "home design assistance" in button_text:
+                elif button_id == "home_design":
                     send_template(sender, "send_home_design_type_buttons")
-                elif "talk to our team" in button_text:
+                elif button_id == "talk_team":
                     send_template(sender, "send_schedule_buttons")
-                elif "today" in button_text:
+                elif button_id == "today":
                     send_template(sender, "confirm_today_evening")
-                elif "tomorrow" in button_text:
+                elif button_id == "tomorrow":
                     send_template(sender, "send_tomorrow_session_slot")
-                elif button_text in ["residential", "commercial", "resort", "farm house", "shopping complex", "others",
-                                     "architectural design", "interior design", "landscape design", "full house design",
-                                     "6:00 pm – 6:30 pm", "6:30 pm – 7:00 pm", "7:00 pm – 7:30 pm",
-                                     "9:00 am – 9:30 am", "9:30 am – 10:00 am", "10:00 am – 10:30 am"]:
+                elif button_id in [
+                    "residential", "commercial", "resort", "farm_house", "shopping_complex", "others",
+                    "architectural_design", "interior_design", "landscape_design", "full_house_design",
+                    "slot_6_6_30", "slot_6_30_7", "slot_7_7_30", "slot_9_9_30", "slot_9_30_10", "slot_10_10_30"
+                ]:
                     send_template(sender, "get_client_info_after_project_type")
-                elif "share my details" in button_text:
+                elif button_id == "share_details":
                     send_text_message(sender, "Great! Please share your name.")
                     session_data[sender] = {"step": "awaiting_name"}
-                elif "start over" in button_text:
+                elif button_id == "start_over":
                     send_template_with_buttons(sender)
                 else:
                     send_text_message(sender, "Sorry, I didn’t understand that. Please select an option from the buttons.")
 
             elif "text" in message:
                 text = message["text"]["body"].strip().lower()
-                print("💬 Text received:", text)
+                print("\U0001F4AC Text received:", text)
                 step = session_data.get(sender, {}).get("step")
 
                 if step == "awaiting_name":
                     session_data[sender]["name"] = text
                     session_data[sender]["step"] = "awaiting_email"
-                    send_text_message(sender, "Thanks, {0}! Could you please share your email ID?".format(text.title()))
+                    send_text_message(sender, f"Thanks, {text.title()}! Could you please share your email ID?")
 
                 elif step == "awaiting_email":
                     session_data[sender]["email"] = text
