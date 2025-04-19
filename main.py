@@ -20,7 +20,7 @@ def webhook():
 
     if request.method == "POST":
         data = request.get_json()
-        print("📥 Webhook Received:\n", json.dumps(data, indent=2))
+        print("\U0001F4E5 Webhook Received:\n", json.dumps(data, indent=2))
 
         try:
             for entry in data.get("entry", []):
@@ -28,13 +28,47 @@ def webhook():
                     value = change.get("value", {})
                     messages = value.get("messages", [])
                     if messages:
-                        sender_id = messages[0]["from"]
-                        send_template_reply(sender_id)
+                        message = messages[0]
+                        sender_id = message["from"]
+
+                        if message.get("type") == "text":
+                            user_text = message["text"]["body"].strip().lower()
+                            handle_text_reply(sender_id, user_text)
+                        else:
+                            send_template_reply(sender_id)
         except Exception as e:
             print("❌ Error while processing message:", e)
 
         return "EVENT_RECEIVED", 200
 
+def handle_text_reply(recipient_number, text):
+    if "quote" in text:
+        send_text_reply(recipient_number, "Sure! Please share your site location and project type for a quotation.")
+    elif "call me" in text:
+        send_text_reply(recipient_number, "Got it! Our team will call you shortly.")
+    elif "floor plan" in text:
+        send_text_reply(recipient_number, "We specialize in customized floor plans. Tell us your plot size and facing direction.")
+    elif text in ["hi", "hello", "hey"]:
+        send_template_reply(recipient_number)
+    else:
+        send_text_reply(recipient_number, "Thank you for your message. Our team will respond shortly.")
+
+def send_text_reply(recipient_number, message):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_number,
+        "type": "text",
+        "text": {
+            "body": message
+        }
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    print("\U0001F4E4 Sent text reply:", response.status_code, response.text)
 
 def send_template_reply(recipient_number):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
@@ -56,8 +90,7 @@ def send_template_reply(recipient_number):
     }
 
     response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent template reply:", response.status_code, response.text)
-
+    print("\U0001F4E4 Sent template reply:", response.status_code, response.text)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
