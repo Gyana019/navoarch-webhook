@@ -48,93 +48,24 @@ def send_text_message(recipient_number, message):
     print("📤 Sent text message:", response.status_code, response.text)
 
 def send_project_type_buttons(recipient_number):
-    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient_number,
-        "type": "template",
-        "template": {
-            "name": "send_project_type_buttons",
-            "language": {"code": "en"}
-        }
-    }
-    requests.post(url, headers=headers, json=payload)
+    send_template(recipient_number, "send_project_type_buttons")
 
 def send_design_type_buttons(recipient_number):
-    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient_number,
-        "type": "template",
-        "template": {
-            "name": "send_home_design_type_buttons",
-            "language": {"code": "en"}
-        }
-    }
-    requests.post(url, headers=headers, json=payload)
+    send_template(recipient_number, "send_home_design_type_buttons")
 
 def send_schedule_buttons(recipient_number):
-    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient_number,
-        "type": "template",
-        "template": {
-            "name": "send_schedule_buttons",
-            "language": {"code": "en"}
-        }
-    }
-    requests.post(url, headers=headers, json=payload)
+    send_template(recipient_number, "send_schedule_buttons")
 
 def send_tomorrow_session_slot(recipient_number):
-    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient_number,
-        "type": "template",
-        "template": {
-            "name": "send_tomorrow_session_slot",
-            "language": {"code": "en"}
-        }
-    }
-    response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent tomorrow time slots:", response.status_code, response.text)
+    send_template(recipient_number, "send_tomorrow_session_slot")
 
 def send_get_client_info_template(recipient_number):
-    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient_number,
-        "type": "template",
-        "template": {
-            "name": "get_client_info_after_project_type",
-            "language": {"code": "en"}
-        }
-    }
-    response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent info collection message:", response.status_code, response.text)
+    send_template(recipient_number, "get_client_info_after_project_type")
 
 def send_confirm_today_evening(recipient_number):
+    send_template(recipient_number, "confirm_today_evening")
+
+def send_template(recipient_number, template_name):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
@@ -145,12 +76,12 @@ def send_confirm_today_evening(recipient_number):
         "to": recipient_number,
         "type": "template",
         "template": {
-            "name": "confirm_today_evening",
+            "name": template_name,
             "language": {"code": "en"}
         }
     }
     response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent confirm today evening slots:", response.status_code, response.text)
+    print(f"📤 Sent template {template_name}:", response.status_code, response.text)
 
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
@@ -173,22 +104,22 @@ def webhook():
             sender = message.get("from")
 
             if "interactive" in message:
-                reply_id = message["interactive"]["button_reply"]["id"]
-                print("🔘 Button clicked:", reply_id)
+                button_text = message["interactive"]["button_reply"]["title"].strip().lower()
+                print("🔘 Button clicked (text):", button_text)
 
-                if reply_id == "plan_project":
+                if "plan a building project" in button_text:
                     send_project_type_buttons(sender)
-                elif reply_id == "home_design":
+                elif "home design assistance" in button_text:
                     send_design_type_buttons(sender)
-                elif reply_id == "talk_team":
+                elif "talk to our team" in button_text:
                     send_schedule_buttons(sender)
-                elif reply_id == "today_evening":
+                elif "today evening" in button_text:
                     send_confirm_today_evening(sender)
-                elif reply_id == "tomorrow":
+                elif "tomorrow" in button_text:
                     send_tomorrow_session_slot(sender)
-                elif reply_id == "residential_project":
+                elif "residential" in button_text or "commercial" in button_text:
                     send_get_client_info_template(sender)
-                elif reply_id == "share_client_info":
+                elif "share my details" in button_text:
                     send_get_client_info_template(sender)
                 else:
                     send_text_message(sender, "Sorry, I didn’t understand that. Please select an option from the buttons.")
