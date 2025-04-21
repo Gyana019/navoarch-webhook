@@ -20,7 +20,7 @@ sheet = client.open("NAVOARCH_Lead_Log").sheet1
 user_sessions = {}
 
 # === WhatsApp API Credentials (set these in Render Env too)
-WHATSAPP_TOKEN = os.getenv("EAAOYazi12RkBO5EyUFpbVWbA8b0AdU5NMxZB0mqm3l5DPzBi2paAUZBeeiYiAPbzDYndE1Prz6T8OOCRKrD1pmqYdoHw9ZCfcfrCYuJpR8zS5JEfc6kEmRXWaC1f5zbf6BXIwrdkqVf95BOSlsqA7qG9Iw7cY9EiZBeF94BTCO8NBqY9YiKZCvyMT0ZCA2ZAxW3PlCZCF1rJE8k9L9PDdxplAkFiNrTD")  # your WhatsApp token
+WHATSAPP_TOKEN = os.getenv("EAAOYazi12RkBOZBeZBRpGVjKzFEOkny2GRcCQku3KbXLMuLwJZAI3ebPvsmmIG5byKSy5xRZBMhVNs0sxiRx0cIyZCZArQZC7mqJKXVZAIC2ghdZC4queEeephj0BQzdTXgmMOnnVetWmJXKJ1eH0G4InmymRC7SPcrhWT967v7o0AU6gUrLIBnAlbinKV8n5Jdfqq2jDzIMj3QAEzxI4w5vi24hBOacZD")  # your WhatsApp token
 PHONE_NUMBER_ID = os.getenv("651744254683036")  # your phone number ID
 
 def send_whatsapp_message(phone, message):
