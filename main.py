@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 # === Google Sheets Setup ===
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("your_creds.json", scope)  # <-- FIXED PATH
+creds = ServiceAccountCredentials.from_json_keyfile_name("your_creds.json", scope)  # Corrected path
 client = gspread.authorize(creds)
 sheet = client.open("NAVOARCH_Lead_Log").sheet1
 
@@ -43,15 +43,13 @@ def webhook():
     print("Incoming:", data)
 
     try:
-        # Extract phone number and message
         phone = data['entry'][0]['changes'][0]['value']['messages'][0]['from']
         msg_body = data['entry'][0]['changes'][0]['value']['messages'][0].get('text', {}).get('body', '').strip()
         print(f"Message from {phone}: {msg_body}")
 
-        # Get current session state
         state = user_sessions.get(phone, {})
 
-        # Step 1: Interest
+        # Step 1: Intent Selection
         if msg_body in ["Design Services Only", "End-to-End Execution", "Talk to Our Team"]:
             user_sessions[phone] = {"interest": msg_body}
             send_whatsapp_message(phone, "Great! Could you please share your Email ID?")
@@ -66,12 +64,11 @@ def webhook():
             user_sessions[phone]["name"] = msg_body
             send_whatsapp_message(phone, "Noted. When would you prefer a quick call from our architect?")
 
-        # Step 4: Time
+        # Step 4: Time → Save data
         elif "interest" in state and "email" in state and "name" in state and "time" not in state:
             user_sessions[phone]["time"] = msg_body
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # Save to Google Sheet
             sheet.append_row([
                 phone,
                 state.get("interest", ""),
@@ -85,13 +82,12 @@ def webhook():
             user_sessions.pop(phone)
 
         else:
-            # If unexpected message or no session context
             send_whatsapp_message(phone, "Sorry, I didn't understand that. Please start again by selecting a service option.")
             user_sessions.pop(phone, None)
 
     except Exception as e:
-        print(f"[ERROR] Webhook processing failed: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
+        print(f"[ERROR] Webhook failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
     return jsonify({"status": "received"}), 200
 
