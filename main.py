@@ -1,109 +1,88 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import requests
-import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
 
 app = Flask(__name__)
 
-VERIFY_TOKEN = "navoarch_token"
-ACCESS_TOKEN = "EAAOYazi12RkBOZBTZBj56wTr6XX7XLTjJmolyf3zKQ6ABEqfLwiPM8besoikVabro5VWfABorAr1wrHttlQxMWLgWkgtyYIpZAxN5VkibZAVrlYjRcTGWrdxlupMP83MCqq189HekS1eOF26uCyMCx6qpTyhmDdArZAVnZBTkwc8RZBdeM6hZAT0rUNnLkv4hHypT7capZBSg55iO5phZCoyC7kAJOqYgZD"  # Replace this with your valid access token
-PHONE_NUMBER_ID = "651744254683036"
+# === Google Sheets Setup ===
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("creds/your_creds.json", scope)
+client = gspread.authorize(creds)
+sheet = client.open("NAVOARCH_Lead_Log").sheet1
 
-# Memory store (replace with DB in real project)
-session_data = {}
+# === In-memory user session
+user_sessions = {}
 
-def send_template(recipient, template_name):
+# === WhatsApp Credentials
+WHATSAPP_TOKEN = 'EAAOYazi12RkBO5EyUFpbVWbA8b0AdU5NMxZB0mqm3l5DPzBi2paAUZBeeiYiAPbzDYndE1Prz6T8OOCRKrD1pmqYdoHw9ZCfcfrCYuJpR8zS5JEfc6kEmRXWaC1f5zbf6BXIwrdkqVf95BOSlsqA7qG9Iw7cY9EiZBeF94BTCO8NBqY9YiKZCvyMT0ZCA2ZAxW3PlCZCF1rJE8k9L9PDdxplAkFiNrTD'
+PHONE_NUMBER_ID = '651744254683036'
+
+def send_whatsapp_message(phone, message):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
     headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
     }
     payload = {
         "messaging_product": "whatsapp",
-        "to": recipient,
-        "type": "template",
-        "template": {
-            "name": template_name,
-            "language": {"code": "en"}
-        }
-    }
-    requests.post(url, headers=headers, json=payload)
-
-def send_text(recipient, text):
-    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient,
+        "to": phone,
         "type": "text",
-        "text": {"body": text}
+        "text": {"body": message}
     }
     requests.post(url, headers=headers, json=payload)
 
-@app.route("/webhook", methods=["GET", "POST"])
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    if request.method == "GET":
-        mode = request.args.get("hub.mode")
-        token = request.args.get("hub.verify_token")
-        challenge = request.args.get("hub.challenge")
-        if mode == "subscribe" and token == VERIFY_TOKEN:
-            return challenge, 200
-        return "Forbidden", 403
+    data = request.get_json()
 
-    if request.method == "POST":
-        data = request.get_json()
-        print("📩 Incoming webhook:", json.dumps(data, indent=2))
+    try:
+        phone = data['entry'][0]['changes'][0]['value']['messages'][0]['from']
+        msg_body = data['entry'][0]['changes'][0]['value']['messages'][0].get('text', {}).get('body', '').strip()
 
-        try:
-            changes = data["entry"][0]["changes"][0]
-            value = changes["value"]
-            message = value.get("messages", [{}])[0]
-            sender = message.get("from")
-            wa_id = value.get("contacts", [{}])[0].get("wa_id")
+        state = user_sessions.get(phone, {})
 
-            if "interactive" in message:
-                # Match on BUTTON TEXT instead of ID
-                button_text = message["interactive"]["button_reply"]["title"].strip().lower()
-                print("🟢 Button text clicked:", button_text)
+        # Step 1: Interest Selection
+        if msg_body in ["Design Services Only", "End-to-End Execution", "Talk to Our Team"]:
+            user_sessions[phone] = {"interest": msg_body}
+            send_whatsapp_message(phone, "Great! Could you please share your Email ID?")
+        
+        # Step 2: Email
+        elif "interest" in state and "email" not in state:
+            user_sessions[phone]["email"] = msg_body
+            send_whatsapp_message(phone, "Thanks! May I know your Name?")
 
-                if button_text == "plan a building project":
-                    session_data[sender] = {"interest": "Building Project", "step": "ask_name"}
-                    send_text(sender, "Great! May I know your name?")
-                elif button_text == "home design assistance":
-                    session_data[sender] = {"interest": "Home Design", "step": "ask_name"}
-                    send_text(sender, "Sure! Could you share your name?")
-                elif button_text == "talk to our team":
-                    session_data[sender] = {"interest": "Direct Talk", "step": "ask_name"}
-                    send_text(sender, "Let’s get started! What’s your name?")
-                else:
-                    send_text(sender, "Sorry, I didn’t get that. Please choose from the options shown.")
+        # Step 3: Name
+        elif "interest" in state and "email" in state and "name" not in state:
+            user_sessions[phone]["name"] = msg_body
+            send_whatsapp_message(phone, "Noted. When would you prefer a quick call from our architect?")
 
-            elif "text" in message:
-                user_input = message["text"]["body"].strip()
-                step = session_data.get(sender, {}).get("step")
+        # Step 4: Preferred Time
+        elif "interest" in state and "email" in state and "name" in state and "time" not in state:
+            user_sessions[phone]["time"] = msg_body
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                if step == "ask_name":
-                    session_data[sender]["name"] = user_input
-                    session_data[sender]["step"] = "ask_phone"
-                    send_text(sender, f"Thanks {user_input.title()}! May I have your phone number?")
-                elif step == "ask_phone":
-                    session_data[sender]["phone"] = user_input
-                    session_data[sender]["step"] = "ask_time"
-                    send_text(sender, "Perfect. When is a good time for our team to call you?")
-                elif step == "ask_time":
-                    session_data[sender]["time"] = user_input
-                    session_data[sender]["step"] = "done"
-                    send_text(sender, "Thank you! One of our architects will call you soon. ✨")
-                    print("✅ Lead Captured:", session_data[sender])
-                else:
-                    if user_input.lower() in ["hi", "hello", "hey"]:
-                        send_template(sender, "navoarch_welcome_01")
-                    else:
-                        send_text(sender, "Hi 👋 Please choose from the options above to begin.")
+            # Save to Google Sheet
+            sheet.append_row([
+                phone,
+                state.get("interest", ""),
+                state.get("email", ""),
+                state.get("name", ""),
+                msg_body,
+                now
+            ])
 
-        except Exception as e:
-            print("❌ Error:", e)
+            send_whatsapp_message(phone, "✅ Thank you! Our team will contact you at your preferred time.")
+            user_sessions.pop(phone)
 
-        return "EVENT_RECEIVED", 200
+    except Exception as e:
+        print(f"Error: {e}")
+    return jsonify({"status": "received"}), 200
+
+@app.route("/", methods=["GET"])
+def index():
+    return "NAVOARCH Webhook is running!", 200
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
