@@ -8,14 +8,14 @@ app = Flask(__name__)
 
 # === Google Sheets Setup ===
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("creds/your_creds.json", scope)
+creds = ServiceAccountCredentials.from_json_keyfile_name("your_creds.json", scope)  # <-- FIXED PATH
 client = gspread.authorize(creds)
 sheet = client.open("NAVOARCH_Lead_Log").sheet1
 
-# === In-memory user session
+# === In-memory user session tracking
 user_sessions = {}
 
-# === WhatsApp Credentials
+# === WhatsApp API Credentials
 WHATSAPP_TOKEN = 'EAAOYazi12RkBO5EyUFpbVWbA8b0AdU5NMxZB0mqm3l5DPzBi2paAUZBeeiYiAPbzDYndE1Prz6T8OOCRKrD1pmqYdoHw9ZCfcfrCYuJpR8zS5JEfc6kEmRXWaC1f5zbf6BXIwrdkqVf95BOSlsqA7qG9Iw7cY9EiZBeF94BTCO8NBqY9YiKZCvyMT0ZCA2ZAxW3PlCZCF1rJE8k9L9PDdxplAkFiNrTD'
 PHONE_NUMBER_ID = '651744254683036'
 
@@ -31,23 +31,31 @@ def send_whatsapp_message(phone, message):
         "type": "text",
         "text": {"body": message}
     }
-    requests.post(url, headers=headers, json=payload)
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        print("Message sent:", response.status_code, response.text)
+    except Exception as e:
+        print("Failed to send message:", e)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
+    print("Incoming:", data)
 
     try:
+        # Extract phone number and message
         phone = data['entry'][0]['changes'][0]['value']['messages'][0]['from']
         msg_body = data['entry'][0]['changes'][0]['value']['messages'][0].get('text', {}).get('body', '').strip()
+        print(f"Message from {phone}: {msg_body}")
 
+        # Get current session state
         state = user_sessions.get(phone, {})
 
-        # Step 1: Interest Selection
+        # Step 1: Interest
         if msg_body in ["Design Services Only", "End-to-End Execution", "Talk to Our Team"]:
             user_sessions[phone] = {"interest": msg_body}
             send_whatsapp_message(phone, "Great! Could you please share your Email ID?")
-        
+
         # Step 2: Email
         elif "interest" in state and "email" not in state:
             user_sessions[phone]["email"] = msg_body
@@ -58,7 +66,7 @@ def webhook():
             user_sessions[phone]["name"] = msg_body
             send_whatsapp_message(phone, "Noted. When would you prefer a quick call from our architect?")
 
-        # Step 4: Preferred Time
+        # Step 4: Time
         elif "interest" in state and "email" in state and "name" in state and "time" not in state:
             user_sessions[phone]["time"] = msg_body
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -76,8 +84,15 @@ def webhook():
             send_whatsapp_message(phone, "✅ Thank you! Our team will contact you at your preferred time.")
             user_sessions.pop(phone)
 
+        else:
+            # If unexpected message or no session context
+            send_whatsapp_message(phone, "Sorry, I didn't understand that. Please start again by selecting a service option.")
+            user_sessions.pop(phone, None)
+
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"[ERROR] Webhook processing failed: {e}")
+        return jsonify({"status": "error", "error": str(e)}), 500
+
     return jsonify({"status": "received"}), 200
 
 @app.route("/", methods=["GET"])
