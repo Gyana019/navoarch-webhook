@@ -5,13 +5,13 @@ import json
 app = Flask(__name__)
 
 VERIFY_TOKEN = "navoarch_token"
-ACCESS_TOKEN = "EAAOYazi12RkBO5RgSvAG8UnWGoXdac486stH73F6N1P24q09wXiAUu9tRMeoeoeKfzPAKZBpouQcaSPLl41hE7CDiQUU6UkWfL3wGEZA1DtGaIOIZCejZASEYeZBsm7N3Aq9mPtcnyGAt1MtZCh9WwZA67moJYGeJAUBBgWWsc3WDlZCOeRYTZCSi3aRhOjN7FJt47WsYcgUV2p0HZBmwsZAASWLfPZB65UZD"  # Replace with your permanent token
+ACCESS_TOKEN = "EAAOYazi12RkBOZBTZBj56wTr6XX7XLTjJmolyf3zKQ6ABEqfLwiPM8besoikVabro5VWfABorAr1wrHttlQxMWLgWkgtyYIpZAxN5VkibZAVrlYjRcTGWrdxlupMP83MCqq189HekS1eOF26uCyMCx6qpTyhmDdArZAVnZBTkwc8RZBdeM6hZAT0rUNnLkv4hHypT7capZBSg55iO5phZCoyC7kAJOqYgZD"  # Replace this with your valid access token
 PHONE_NUMBER_ID = "651744254683036"
 
-# In-memory session storage
+# Memory store (replace with DB in real project)
 session_data = {}
 
-def send_template(recipient_number, template_name):
+def send_template(recipient, template_name):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
@@ -19,17 +19,16 @@ def send_template(recipient_number, template_name):
     }
     payload = {
         "messaging_product": "whatsapp",
-        "to": recipient_number,
+        "to": recipient,
         "type": "template",
         "template": {
             "name": template_name,
             "language": {"code": "en"}
         }
     }
-    response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent template:", response.status_code, response.text)
+    requests.post(url, headers=headers, json=payload)
 
-def send_text_message(recipient_number, message):
+def send_text(recipient, text):
     url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
@@ -37,61 +36,74 @@ def send_text_message(recipient_number, message):
     }
     payload = {
         "messaging_product": "whatsapp",
-        "to": recipient_number,
+        "to": recipient,
         "type": "text",
-        "text": {"body": message}
+        "text": {"body": text}
     }
-    response = requests.post(url, headers=headers, json=payload)
-    print("📤 Sent text:", response.status_code, response.text)
+    requests.post(url, headers=headers, json=payload)
 
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
     if request.method == "GET":
-        if request.args.get("hub.verify_token") == VERIFY_TOKEN:
-            return request.args.get("hub.challenge")
-        return "Verification failed", 403
+        mode = request.args.get("hub.mode")
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
+        if mode == "subscribe" and token == VERIFY_TOKEN:
+            return challenge, 200
+        return "Forbidden", 403
 
     if request.method == "POST":
         data = request.get_json()
-        print("📥 Webhook received:\n", json.dumps(data, indent=2))
+        print("📩 Incoming webhook:", json.dumps(data, indent=2))
 
         try:
-            entry = data.get("entry", [])[0]
-            change = entry.get("changes", [])[0]
-            value = change.get("value", {})
+            changes = data["entry"][0]["changes"][0]
+            value = changes["value"]
             message = value.get("messages", [{}])[0]
             sender = message.get("from")
+            wa_id = value.get("contacts", [{}])[0].get("wa_id")
 
             if "interactive" in message:
-                title = message["interactive"]["button_reply"]["title"].lower()
-                print("🔘 Button clicked:", title)
+                # Match on BUTTON TEXT instead of ID
+                button_text = message["interactive"]["button_reply"]["title"].strip().lower()
+                print("🟢 Button text clicked:", button_text)
 
-                session_data[sender] = {"interest": title}
-                send_text_message(sender, "Great! May I know your name?")
-                session_data[sender]["step"] = "awaiting_name"
+                if button_text == "plan a building project":
+                    session_data[sender] = {"interest": "Building Project", "step": "ask_name"}
+                    send_text(sender, "Great! May I know your name?")
+                elif button_text == "home design assistance":
+                    session_data[sender] = {"interest": "Home Design", "step": "ask_name"}
+                    send_text(sender, "Sure! Could you share your name?")
+                elif button_text == "talk to our team":
+                    session_data[sender] = {"interest": "Direct Talk", "step": "ask_name"}
+                    send_text(sender, "Let’s get started! What’s your name?")
+                else:
+                    send_text(sender, "Sorry, I didn’t get that. Please choose from the options shown.")
 
             elif "text" in message:
-                text = message["text"]["body"].strip()
+                user_input = message["text"]["body"].strip()
                 step = session_data.get(sender, {}).get("step")
 
-                if step == "awaiting_name":
-                    session_data[sender]["name"] = text
-                    session_data[sender]["step"] = "awaiting_phone"
-                    send_text_message(sender, "Thanks! Could you please share your phone number?")
-                elif step == "awaiting_phone":
-                    session_data[sender]["phone"] = text
-                    session_data[sender]["step"] = "awaiting_time"
-                    send_text_message(sender, "Noted. When would be a good time to talk?")
-                elif step == "awaiting_time":
-                    session_data[sender]["time"] = text
+                if step == "ask_name":
+                    session_data[sender]["name"] = user_input
+                    session_data[sender]["step"] = "ask_phone"
+                    send_text(sender, f"Thanks {user_input.title()}! May I have your phone number?")
+                elif step == "ask_phone":
+                    session_data[sender]["phone"] = user_input
+                    session_data[sender]["step"] = "ask_time"
+                    send_text(sender, "Perfect. When is a good time for our team to call you?")
+                elif step == "ask_time":
+                    session_data[sender]["time"] = user_input
                     session_data[sender]["step"] = "done"
-                    send_text_message(sender, "Perfect! Our team will reach out to you shortly. ✨")
-                elif text.lower() in ["hi", "hello"]:
-                    send_template(sender, "navoarch_welcome_01")
+                    send_text(sender, "Thank you! One of our architects will call you soon. ✨")
+                    print("✅ Lead Captured:", session_data[sender])
                 else:
-                    send_text_message(sender, "Hi 👋, please tap one of the buttons above to continue.")
+                    if user_input.lower() in ["hi", "hello", "hey"]:
+                        send_template(sender, "navoarch_welcome_01")
+                    else:
+                        send_text(sender, "Hi 👋 Please choose from the options above to begin.")
 
         except Exception as e:
-            print("❌ Error in webhook:", str(e))
+            print("❌ Error:", e)
 
-        return "OK", 200
+        return "EVENT_RECEIVED", 200
